@@ -1,0 +1,2043 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b0b0c" />
+  <meta name="description" content="Assistente RAG para conversar com documentos usando IA" />
+  <title>Assistente de Documentos RAG</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50: '#fff1f0', 100: '#ffd9d6', 200: '#ffb9b3', 300: '#ff8d83', 400: '#ff665a', 500: '#ff4b43', 600: '#e63831', 700: '#be2c27', 800: '#8f2421', 900: '#621d1b' },
+            ink: { 0: '#ffffff', 50: '#f7f7f7', 100: '#eeeeef', 200: '#d9d9dc', 300: '#b9b9be', 400: '#8c8c93', 500: '#6a6a72', 600: '#4c4c52', 700: '#343438', 800: '#232326', 850: '#19191b', 900: '#111113', 950: '#0b0b0c' }
+          },
+          fontFamily: { sans: ['Inter', 'ui-sans-serif', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Helvetica', 'Arial', 'sans-serif'], mono: ['SFMono-Regular', 'Consolas', 'Liberation Mono', 'Menlo', 'monospace'] }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;650;700;800;900&display=swap"
+    rel="stylesheet" />
+
+  <style>
+    :root {
+      --brand-500: #ff4b43;
+      --brand-400: #ff665a;
+      --brand-300: #ff8d83;
+      --success: #38b879;
+      --warning: #f3b440;
+      --danger: #e9504d;
+      --info: #5d8eff;
+      --page: #0b0b0c;
+      --surface-1: #111113;
+      --surface-2: #171719;
+      --surface-3: #1f1f22;
+      --line: rgba(255, 255, 255, .08);
+      --line-strong: rgba(255, 255, 255, .15);
+      --text: #f7f7f7;
+      --text-muted: #9b9ba2;
+      --font-sans: 'Inter', ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+      --r-xs: 6px;
+      --r-sm: 10px;
+      --r-md: 16px;
+      --r-pill: 999px;
+      --ease-out: cubic-bezier(.16, 1, .3, 1);
+      --dur-fast: 140ms;
+      --dur: 240ms;
+      --container: 1360px;
+      --header-h: 68px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      background: var(--page);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: .875rem;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+
+    ::selection {
+      background: var(--brand-500);
+      color: white;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--surface-3);
+      border-radius: 4px;
+    }
+
+    /* Animations */
+    @keyframes pulse-soft {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: .45;
+      }
+    }
+
+    .pulse-soft {
+      animation: pulse-soft 2s ease-in-out infinite;
+    }
+
+    @keyframes slide-down {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .slide-down {
+      animation: slide-down .25s var(--ease-out);
+    }
+
+    @keyframes slide-up {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .slide-up {
+      animation: slide-up .3s var(--ease-out);
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .animate-spin {
+      animation: spin 1.5s linear infinite;
+    }
+
+    @keyframes shimmer {
+      0% {
+        background-position: -200% 0;
+      }
+
+      100% {
+        background-position: 200% 0;
+      }
+    }
+
+    @keyframes bdot {
+
+      0%,
+      80%,
+      100% {
+        transform: scale(.6);
+        opacity: .4;
+      }
+
+      40% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    .dot-b {
+      animation: bdot 1.2s ease-in-out infinite;
+    }
+
+    .dot-b:nth-child(2) {
+      animation-delay: .15s;
+    }
+
+    .dot-b:nth-child(3) {
+      animation-delay: .3s;
+    }
+
+    /* Header */
+    .ds-hdr {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      height: var(--header-h);
+      padding: 0 clamp(16px, 3vw, 32px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      border-bottom: 1px solid var(--line);
+      background: rgba(11, 11, 12, .72);
+      backdrop-filter: blur(20px);
+    }
+
+    .ds-hdr-l {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .ds-hdr-logo {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: var(--brand-500);
+      box-shadow: 0 0 0 1px rgba(255, 75, 67, .25), 0 8px 32px rgba(255, 75, 67, .12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      transition: transform var(--dur-fast) var(--ease-out);
+    }
+
+    .ds-hdr-logo:hover {
+      transform: scale(1.05);
+    }
+
+    .ds-hdr-logo svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .ds-hdr-t {
+      font-size: .875rem;
+      font-weight: 700;
+      letter-spacing: -.02em;
+      color: var(--text);
+      line-height: 1.2;
+    }
+
+    .ds-hdr-t span {
+      display: block;
+      font-size: .6875rem;
+      font-weight: 400;
+      color: var(--text-muted);
+    }
+
+    .ds-hdr-r {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Status */
+    .ds-st {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: var(--r-pill);
+      border: 1px solid var(--line);
+      font-size: .6875rem;
+      font-weight: 600;
+      background: var(--surface-2);
+      color: var(--text-muted);
+      transition: all var(--dur-fast) var(--ease-out);
+    }
+
+    .ds-st-d {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--surface-3);
+      flex-shrink: 0;
+    }
+
+    .ds-st-on {
+      border-color: rgba(56, 184, 121, .3) !important;
+      background: rgba(56, 184, 121, .06) !important;
+      color: var(--success) !important;
+    }
+
+    .ds-st-on .ds-st-d {
+      background: var(--success) !important;
+    }
+
+    .ds-st-off {
+      border-color: rgba(233, 80, 77, .3) !important;
+      background: rgba(233, 80, 77, .06) !important;
+      color: var(--danger) !important;
+    }
+
+    .ds-st-off .ds-st-d {
+      background: var(--danger) !important;
+    }
+
+    /* Buttons */
+    .ds-btn {
+      --btn-bg: transparent;
+      --btn-color: var(--text);
+      --btn-border: var(--line-strong);
+      min-height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 16px;
+      border: 1px solid var(--btn-border);
+      border-radius: var(--r-xs);
+      color: var(--btn-color);
+      background: var(--btn-bg);
+      font-size: .6875rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform var(--dur-fast) var(--ease-out), background var(--dur-fast), border-color var(--dur-fast), opacity var(--dur-fast), box-shadow var(--dur-fast);
+      white-space: nowrap;
+      user-select: none;
+      font-family: var(--font-sans);
+    }
+
+    .ds-btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .ds-btn:active {
+      transform: translateY(0) scale(.985);
+    }
+
+    .ds-btn:disabled {
+      opacity: .35;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .ds-btn-p {
+      --btn-bg: var(--brand-500);
+      --btn-border: var(--brand-500);
+      --btn-color: white;
+    }
+
+    .ds-btn-p:hover {
+      --btn-bg: var(--brand-400);
+      --btn-border: var(--brand-400);
+      box-shadow: 0 0 0 1px rgba(255, 75, 67, .25), 0 8px 32px rgba(255, 75, 67, .12);
+    }
+
+    .ds-btn-s {
+      --btn-bg: var(--surface-3);
+      --btn-border: var(--line-strong);
+      --btn-color: var(--text);
+    }
+
+    .ds-btn-s:hover {
+      --btn-bg: var(--surface-3);
+    }
+
+    .ds-btn-d {
+      --btn-bg: rgba(233, 80, 77, .12);
+      --btn-border: rgba(233, 80, 77, .25);
+      --btn-color: var(--danger);
+    }
+
+    .ds-btn-d:hover {
+      --btn-bg: rgba(233, 80, 77, .2);
+    }
+
+    .ds-btn-sm {
+      min-height: 34px;
+      padding: 0 12px;
+      font-size: 10px;
+    }
+
+    .ds-btn-full {
+      width: 100%;
+    }
+
+    .ds-btn svg {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    .ds-btn-sm svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .ds-btn-load {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .ds-btn-load::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .05), transparent);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+
+    /* Card */
+    .ds-cd {
+      border: 1px solid var(--line);
+      border-radius: var(--r-md);
+      background: var(--surface-1);
+      transition: border-color var(--dur) var(--ease-out);
+    }
+
+    .ds-cd-hd {
+      padding: 1.25rem 1.25rem .75rem;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .75rem;
+    }
+
+    .ds-cd-hl {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .ds-cd-ic {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .ds-cd-ic svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .ds-cd-t {
+      font-size: .875rem;
+      font-weight: 650;
+      letter-spacing: -.01em;
+      color: var(--text);
+      margin: 0;
+    }
+
+    .ds-cd-st {
+      font-size: .6875rem;
+      color: var(--text-muted);
+      margin: 0;
+    }
+
+    .ds-cd-bd {
+      padding: 1.25rem;
+    }
+
+    /* Collapse */
+    .ds-clp-ic {
+      transition: transform var(--dur) var(--ease-out);
+    }
+
+    .ds-clp-ic.cl {
+      transform: rotate(-90deg);
+    }
+
+    .ds-cd-api .ds-cd-bd {
+      overflow: hidden;
+      transition: max-height var(--dur) var(--ease-out), opacity var(--dur) var(--ease-out), padding var(--dur) var(--ease-out);
+      max-height: 600px;
+      opacity: 1;
+    }
+
+    .ds-cd-api.cl .ds-cd-bd {
+      max-height: 0 !important;
+      opacity: 0;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+      margin: 0 !important;
+      border: none;
+    }
+
+    .ds-cd-api.cl .ds-cd-hd {
+      border-bottom-color: transparent;
+    }
+
+    /* Form */
+    .ds-fd {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .ds-lb {
+      color: var(--text-muted);
+      font-size: .6875rem;
+      font-weight: 650;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ds-lb svg {
+      width: 14px;
+      height: 14px;
+      opacity: .7;
+    }
+
+    .ds-inp,
+    .ds-sel {
+      width: 100%;
+      height: 44px;
+      padding: 0 13px;
+      color: var(--text);
+      background: var(--surface-2);
+      border: 1px solid var(--line-strong);
+      border-radius: var(--r-xs);
+      outline: none;
+      font-size: .875rem;
+      font-family: var(--font-sans);
+      transition: border var(--dur-fast), box-shadow var(--dur-fast), background var(--dur-fast);
+      appearance: none;
+    }
+
+    .ds-inp::placeholder {
+      color: var(--surface-3);
+    }
+
+    .ds-inp:focus,
+    .ds-sel:focus {
+      border-color: rgba(255, 75, 67, .6);
+      box-shadow: 0 0 0 3px rgba(255, 75, 67, .1);
+      background: var(--surface-1);
+    }
+
+    .ds-inp:disabled,
+    .ds-sel:disabled {
+      opacity: .4;
+      cursor: not-allowed;
+    }
+
+    .ds-sel-w {
+      position: relative;
+    }
+
+    .ds-sel-w::after {
+      content: '';
+      position: absolute;
+      right: 13px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 10px;
+      height: 10px;
+      background: var(--text-muted);
+      clip-path: polygon(50% 60%, 0 20%, 100% 20%);
+      pointer-events: none;
+    }
+
+    .ds-sel-w .ds-sel {
+      padding-right: 36px;
+      cursor: pointer;
+    }
+
+    .ds-inp-g {
+      position: relative;
+    }
+
+    .ds-inp-g .ds-inp {
+      padding-right: 40px;
+    }
+
+    .ds-inp-gb {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px;
+      display: flex;
+      border-radius: 4px;
+    }
+
+    .ds-inp-gb svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* Dropzone */
+    .ds-dz {
+      border: 2px dashed var(--line-strong);
+      border-radius: var(--r-sm);
+      padding: 1.5rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all var(--dur) var(--ease-out);
+      background: var(--surface-2);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .75rem;
+    }
+
+    .ds-dz:hover {
+      border-color: var(--brand-500);
+      background: rgba(255, 75, 67, .03);
+    }
+
+    .ds-dz.ac {
+      border-color: var(--brand-500);
+      background: rgba(255, 75, 67, .06);
+    }
+
+    .ds-dz.hf {
+      border-color: var(--success);
+      background: rgba(56, 184, 121, .04);
+    }
+
+    .ds-dz-ic {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: var(--surface-1);
+      border: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      transition: color var(--dur-fast);
+    }
+
+    .ds-dz:hover .ds-dz-ic {
+      color: var(--brand-400);
+    }
+
+    .ds-dz-ic svg {
+      width: 22px;
+      height: 22px;
+    }
+
+    .ds-dz-t {
+      font-size: .875rem;
+      font-weight: 600;
+      color: var(--text);
+      margin: 0;
+    }
+
+    .ds-dz-h {
+      font-size: .6875rem;
+      color: var(--text-muted);
+      margin: 0;
+    }
+
+    /* Config badge */
+    .ds-cbg {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: var(--r-pill);
+      font-size: 10px;
+      font-weight: 600;
+      border: 1px solid var(--line);
+      background: var(--surface-2);
+      color: var(--text-muted);
+    }
+
+    /* Config display */
+    .ds-cfg {
+      background: rgba(56, 184, 121, .04);
+      border: 1px solid rgba(56, 184, 121, .18);
+      border-radius: var(--r-sm);
+      padding: 1rem;
+    }
+
+    .ds-cfg-t {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: .6875rem;
+      font-weight: 700;
+      color: var(--success);
+      margin-bottom: .75rem;
+    }
+
+    .ds-cfg-i {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: .6875rem;
+      color: var(--text-muted);
+      padding: 2px 0;
+    }
+
+    .ds-cfg-i strong {
+      color: var(--text-muted);
+      font-weight: 600;
+      min-width: 52px;
+    }
+
+    .ds-cfg-i span {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .ds-cfg-i code {
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      font-size: 10px;
+    }
+
+    /* Doc card */
+    .ds-dc {
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+      padding: 1rem;
+    }
+
+    .ds-di {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .ds-di-ic {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .ds-di-ic svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .ds-di-n {
+      font-size: .875rem;
+      font-weight: 600;
+      color: var(--text);
+      margin: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .ds-di-m {
+      font-size: .6875rem;
+      color: var(--text-muted);
+      margin: 2px 0 0;
+    }
+
+    .ds-ds {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .75rem;
+      margin-top: 1rem;
+    }
+
+    .ds-dst {
+      background: rgba(255, 255, 255, .02);
+      border: 1px solid var(--line);
+      border-radius: var(--r-xs);
+      padding: .75rem;
+      text-align: center;
+    }
+
+    .ds-dst-l {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--text-muted);
+    }
+
+    .ds-dst-v {
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-top: 2px;
+    }
+
+    .ds-dst-s {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Chat */
+    .ds-cht-c {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      min-height: 0;
+      scroll-behavior: smooth;
+    }
+
+    .ds-msg {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      max-width: 88%;
+      animation: slide-up .25s var(--ease-out);
+    }
+
+    .ds-msg-u {
+      align-self: flex-end;
+      flex-direction: row-reverse;
+    }
+
+    .ds-msg-a {
+      align-self: flex-start;
+    }
+
+    .ds-msg-av {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, .2);
+    }
+
+    .ds-msg-av svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .ds-msg-avu {
+      background: var(--surface-3);
+      color: var(--text);
+    }
+
+    .ds-msg-ava {
+      background: var(--brand-500);
+      color: white;
+      box-shadow: 0 0 0 1px rgba(255, 75, 67, .25), 0 8px 32px rgba(255, 75, 67, .12);
+    }
+
+    .ds-msg-b {
+      padding: 12px 16px;
+      border-radius: var(--r-sm);
+      line-height: 1.6;
+      font-size: .875rem;
+    }
+
+    .ds-msg-bu {
+      background: var(--brand-500);
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+    .ds-msg-ba {
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      color: var(--text);
+      border-bottom-left-radius: 4px;
+    }
+
+    .ds-msg-b code {
+      background: rgba(255, 255, 255, .06);
+      color: var(--brand-300);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: .6875rem;
+      font-weight: 600;
+    }
+
+    .ds-msg-b pre {
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      color: var(--text);
+      padding: .75rem;
+      border-radius: var(--r-xs);
+      overflow-x: auto;
+      font-size: .6875rem;
+      font-family: var(--font-mono);
+      margin: .5rem 0;
+    }
+
+    .ds-msg-b pre code {
+      background: none;
+      padding: 0;
+      color: inherit;
+    }
+
+    .ds-msg-b blockquote {
+      border-left: 3px solid var(--brand-500);
+      padding-left: .75rem;
+      color: var(--text-muted);
+      font-style: italic;
+      margin: .5rem 0;
+    }
+
+    /* Loading */
+    .ds-msg-ld {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .ds-msg-ldd {
+      display: flex;
+      gap: 4px;
+    }
+
+    .ds-msg-ldd>div {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--brand-500);
+      animation: bdot 1.2s ease-in-out infinite;
+    }
+
+    .ds-msg-ldd>div:nth-child(2) {
+      animation-delay: .15s;
+    }
+
+    .ds-msg-ldd>div:nth-child(3) {
+      animation-delay: .3s;
+    }
+
+    .ds-msg-ldt {
+      font-size: .6875rem;
+      font-style: italic;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* Welcome */
+    .ds-wc {
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+      padding: 1.25rem;
+      border-bottom-left-radius: 4px;
+    }
+
+    .ds-wc-h {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      margin: 0 0 8px;
+    }
+
+    .ds-wc-p {
+      color: var(--text-muted);
+      font-size: .875rem;
+      margin: 0 0 1rem;
+      line-height: 1.7;
+    }
+
+    .ds-wc-t {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+      background: var(--surface-1);
+      padding: .75rem;
+      border-radius: var(--r-xs);
+      border: 1px solid var(--line);
+    }
+
+    .ds-wc-t span {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: .6875rem;
+      color: var(--text-muted);
+    }
+
+    .ds-wc-t svg {
+      width: 14px;
+      height: 14px;
+      opacity: .7;
+    }
+
+    /* System log */
+    .ds-log {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      max-width: 80%;
+      margin: 0 auto;
+      padding: 8px 14px;
+      border-radius: var(--r-pill);
+      border: 1px solid var(--line);
+      font-size: .6875rem;
+      font-weight: 600;
+      align-self: center;
+      animation: slide-down .25s var(--ease-out);
+    }
+
+    .ds-log svg {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+    }
+
+    .ds-log-i {
+      background: rgba(255, 255, 255, .02);
+      color: var(--text-muted);
+    }
+
+    .ds-log-s {
+      background: rgba(56, 184, 121, .06);
+      border-color: rgba(56, 184, 121, .2);
+      color: var(--success);
+    }
+
+    .ds-log-e {
+      background: rgba(233, 80, 77, .06);
+      border-color: rgba(233, 80, 77, .2);
+      color: var(--danger);
+    }
+
+    /* Chat input */
+    .ds-ci-w {
+      padding: 1rem;
+      border-top: 1px solid var(--line);
+      background: var(--surface-1);
+      flex-shrink: 0;
+    }
+
+    .ds-ci-r {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+    }
+
+    .ds-ci {
+      flex: 1;
+      height: 48px;
+      padding: 0 16px;
+      background: var(--surface-2);
+      border: 1px solid var(--line-strong);
+      border-radius: var(--r-sm);
+      color: var(--text);
+      font-size: .875rem;
+      font-family: var(--font-sans);
+      outline: none;
+      transition: border var(--dur-fast), box-shadow var(--dur-fast), background var(--dur-fast);
+    }
+
+    .ds-ci::placeholder {
+      color: var(--surface-3);
+    }
+
+    .ds-ci:focus {
+      border-color: rgba(255, 75, 67, .5);
+      box-shadow: 0 0 0 3px rgba(255, 75, 67, .08);
+      background: var(--surface-1);
+    }
+
+    .ds-ci:disabled {
+      opacity: .4;
+      cursor: not-allowed;
+    }
+
+    .ds-cs {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--r-sm);
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all var(--dur-fast) var(--ease-out);
+      flex-shrink: 0;
+    }
+
+    .ds-cs:disabled {
+      opacity: .35;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .ds-cs svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .ds-cs-a {
+      background: var(--brand-500);
+      color: white;
+    }
+
+    .ds-cs-a:hover {
+      background: var(--brand-400);
+      box-shadow: 0 0 0 1px rgba(255, 75, 67, .25), 0 8px 32px rgba(255, 75, 67, .12);
+      transform: translateY(-1px);
+    }
+
+    .ds-cs-i {
+      background: var(--surface-2);
+      color: var(--text-muted);
+    }
+
+    /* Chips */
+    .ds-chips {
+      padding: .75rem 1.25rem;
+      border-top: 1px solid var(--line);
+      background: var(--surface-2);
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      overflow-x: auto;
+      flex-shrink: 0;
+    }
+
+    .ds-chips::-webkit-scrollbar {
+      height: 3px;
+    }
+
+    .ds-chips-l {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-muted);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .ds-chips-l svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    .ds-chip {
+      padding: 5px 12px;
+      border-radius: var(--r-pill);
+      border: 1px solid var(--line);
+      background: var(--surface-1);
+      color: var(--text-muted);
+      font-size: .6875rem;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all var(--dur-fast) var(--ease-out);
+      flex-shrink: 0;
+    }
+
+    .ds-chip:hover {
+      border-color: var(--brand-500);
+      color: var(--brand-300);
+      background: rgba(255, 75, 67, .06);
+    }
+
+    /* Layout */
+    .ds-ly {
+      width: min(var(--container), 100%);
+      margin: 0 auto;
+      padding: 1.5rem clamp(16px, 3vw, 32px);
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+      overflow: hidden;
+    }
+
+    @media (min-width:1024px) {
+      .ds-ly {
+        grid-template-columns: 380px 1fr;
+      }
+    }
+
+    .ds-sb {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    .ds-mn {
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--line);
+      border-radius: var(--r-md);
+      background: var(--surface-1);
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* How-to */
+    .ds-ht {
+      display: flex;
+      flex-direction: column;
+      gap: .75rem;
+    }
+
+    .ds-ht-h {
+      font-size: .875rem;
+      font-weight: 650;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ds-ht-h svg {
+      width: 16px;
+      height: 16px;
+      color: var(--brand-400);
+    }
+
+    .ds-ht-s {
+      display: flex;
+      gap: 10px;
+      font-size: .6875rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .ds-ht-n {
+      color: var(--brand-500);
+      font-weight: 700;
+      font-size: 10px;
+      flex-shrink: 0;
+      width: 16px;
+      text-align: center;
+    }
+
+    /* Footer */
+    .ds-ft {
+      padding: 1rem clamp(16px, 3vw, 32px);
+      text-align: center;
+      font-size: .6875rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--line);
+      background: var(--surface-1);
+      flex-shrink: 0;
+    }
+
+    /* Chat header */
+    .ds-cht-h {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface-2);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: .5rem;
+      flex-shrink: 0;
+    }
+
+    .ds-cht-hl {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .ds-cht-hd {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .ds-cht-ht {
+      font-size: .875rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .ds-cht-hi {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      font-size: .6875rem;
+      color: var(--text-muted);
+    }
+
+    /* Hidden utility */
+    .hidden {
+      display: none !important;
+    }
+
+    /* Responsive */
+    @media (max-width:1023px) {
+      body {
+        overflow: auto;
+      }
+
+      .ds-hdr-t span {
+        display: none;
+      }
+
+      .ds-st span {
+        display: none;
+      }
+
+      .ds-ly {
+        overflow: visible;
+      }
+
+      .ds-sb {
+        max-height: none;
+        overflow: visible;
+      }
+
+      .ds-mn {
+        min-height: 500px;
+      }
+
+      .ds-cht-hi>span:not(:first-child) {
+        display: none;
+      }
+    }
+
+    @media (max-width:639px) {
+      :root {
+        --header-h: 60px;
+      }
+
+      .ds-ly {
+        padding: 1rem 12px;
+        gap: 1rem;
+      }
+
+      .ds-msg {
+        max-width: 95%;
+      }
+
+      .ds-ds {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+
+      *,
+      *::before,
+      *::after {
+        animation-duration: .01ms !important;
+        transition-duration: .01ms !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- HEADER -->
+  <header class="ds-hdr">
+    <div class="ds-hdr-l">
+      <div class="ds-hdr-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <path
+            d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.04-2.44V7.5a2.5 2.5 0 0 1 4.91-.94" />
+          <path
+            d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.04-2.44V7.5a2.5 2.5 0 0 0-4.91-.94" />
+          <path d="M8 11h1M15 11h1M8 14h1M15 14h1" />
+        </svg>
+      </div>
+      <div>
+        <div class="ds-hdr-t">Assistente de Documentos<span>Agente Conversacional com RAG</span></div>
+      </div>
+    </div>
+    <div class="ds-hdr-r">
+      <div id="connection-status" class="ds-st"><span class="ds-st-d" id="status-dot"></span><span>Verificando
+          servidor...</span></div>
+      <button id="btn-reset" class="ds-btn ds-btn-sm ds-btn-d hidden">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+          <line x1="10" y1="11" x2="10" y2="17" />
+          <line x1="14" y1="11" x2="14" y2="17" />
+        </svg>
+        Resetar Sessão
+      </button>
+    </div>
+  </header>
+
+  <!-- LAYOUT -->
+  <div class="ds-ly">
+
+    <!-- SIDEBAR -->
+    <aside class="ds-sb">
+
+      <!-- CARREGAR DOCUMENTO - SEMPRE NO TOPO, VISÍVEL SEM SCROLL -->
+      <div class="ds-cd" id="upload-card">
+        <div class="ds-cd-hd">
+          <div class="ds-cd-hl">
+            <div class="ds-cd-ic" style="background:rgba(255,75,67,.12);color:var(--brand-400)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+            </div>
+            <div>
+              <h2 class="ds-cd-t">Carregar Documento</h2>
+              <p class="ds-cd-st">PDF ou TXT, máx. 10MB</p>
+            </div>
+          </div>
+        </div>
+        <div class="ds-cd-bd" style="display:flex;flex-direction:column;gap:1rem">
+          <div id="drop-zone" class="ds-dz">
+            <input type="file" id="input-file" accept=".pdf,.txt" style="display:none" />
+            <div class="ds-dz-ic" id="upload-icon-wrap">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round" id="upload-icon">
+                <path d="M12 16V4M8 8l4-4 4 4" />
+                <path d="M16 14v2a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-2" />
+              </svg>
+            </div>
+            <div>
+              <p class="ds-dz-t" id="dropzone-title">Clique para selecionar</p>
+              <p class="ds-dz-h" id="dropzone-hint">PDF ou TXT (máx. 10MB)</p>
+            </div>
+          </div>
+          <button id="btn-upload" class="ds-btn ds-btn-p ds-btn-full">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            Processar Documento
+          </button>
+        </div>
+      </div>
+
+      <!-- CONFIGURAR API - COLAPSÁVEL, COMEÇA RECOLHIDO -->
+      <div class="ds-cd ds-cd-api cl" id="api-config-card">
+        <div class="ds-cd-hd" id="api-config-toggle" style="cursor:pointer;user-select:none">
+          <div class="ds-cd-hl">
+            <div class="ds-cd-ic" style="background:rgba(255,75,67,.1);color:var(--brand-400)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path
+                  d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+              </svg>
+            </div>
+            <div>
+              <h2 class="ds-cd-t">Configurar API</h2>
+              <p class="ds-cd-st">Provedor, chave e modelo</p>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div id="api-status-badge" class="ds-cbg hidden"><span class="ds-st-d" id="api-status-dot"></span><span
+                id="api-status-text">Não configurado</span></div>
+            <svg id="api-collapse-icon" class="ds-clp-ic cl" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+              style="width:18px;height:18px;color:var(--text-muted);transition:transform var(--dur-fast) var(--ease-out)">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </div>
+        </div>
+        <div id="api-config-body" class="ds-cd-bd" style="display:flex;flex-direction:column;gap:1rem">
+          <p style="font-size:.6875rem;color:var(--text-muted);line-height:1.6;margin:0">Escolha o provedor de IA,
+            insira sua chave de API e selecione o modelo. Sua chave fica apenas na sessão atual.</p>
+
+          <label class="ds-fd"><span class="ds-lb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="2" />
+                <path d="M16 8a6 6 0 0 0-8 0" />
+                <path d="M18 6a10 10 0 0 0-12 0" />
+              </svg>Provedor</span>
+            <div class="ds-sel-w"><select id="select-provider" class="ds-sel">
+                <option value="">Selecione um provedor...</option>
+              </select></div>
+          </label>
+          <label class="ds-fd"><span class="ds-lb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>Chave de API</span>
+            <div class="ds-inp-g"><input type="password" id="input-api-key" placeholder="sk-..." disabled
+                class="ds-inp" />
+              <button type="button" id="btn-toggle-key-visibility" class="ds-inp-gb" tabindex="-1">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round" id="key-visibility-icon">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </button>
+            </div>
+          </label>
+          <label class="ds-fd"><span class="ds-lb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="4" y="4" width="16" height="16" rx="2" />
+                <rect x="9" y="9" width="6" height="6" />
+                <path d="M15 2v2M9 2v2M15 20v2M9 20v2" />
+              </svg>Modelo</span>
+            <div class="ds-sel-w"><select id="select-model" class="ds-sel" disabled>
+                <option value="">Selecione um provedor primeiro...</option>
+              </select></div>
+          </label>
+          <button id="btn-configure-api" class="ds-btn ds-btn-p" disabled style="width:100%">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <path d="M12 15v5M9 3l3-3 3 3" />
+              <path d="M5 21h14" />
+            </svg>Salvar Configuração
+          </button>
+          <div id="current-api-config" class="ds-cfg hidden slide-down">
+            <div class="ds-cfg-t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>API Configurada</div>
+            <div class="ds-cfg-i"><strong>Provedor:</strong><span id="config-provider-label">—</span></div>
+            <div class="ds-cfg-i"><strong>Modelo:</strong><span id="config-model-label">—</span></div>
+            <div class="ds-cfg-i"><strong>Chave:</strong><code id="config-key-preview">••••••••</code></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DOCUMENTO ATIVO -->
+      <div id="active-document-card" class="ds-cd hidden">
+        <div class="ds-cd-hd">
+          <div class="ds-cd-hl">
+            <div class="ds-cd-ic" style="background:rgba(56,184,121,.12);color:var(--success)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+              </svg>
+            </div>
+            <div>
+              <h2 class="ds-cd-t">Documento Ativo</h2>
+              <p class="ds-cd-st">Indexado no FAISS local</p>
+            </div>
+          </div>
+        </div>
+        <div class="ds-cd-bd" style="display:flex;flex-direction:column;gap:1rem">
+          <div class="ds-dc">
+            <div class="ds-di">
+              <div class="ds-di-ic" id="doc-type-badge" style="background:rgba(255,75,67,.1);color:var(--brand-400)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
+              </div>
+              <div style="min-width:0;flex:1">
+                <p class="ds-di-n" id="doc-filename">nome_do_arquivo.pdf</p>
+                <p class="ds-di-m" id="doc-size">Indexado no FAISS local</p>
+              </div>
+            </div>
+            <div class="ds-ds">
+              <div class="ds-dst">
+                <div class="ds-dst-l">Chunks</div>
+                <div class="ds-dst-v" id="info-chunks">0</div>
+              </div>
+              <div class="ds-dst">
+                <div class="ds-dst-l">Embeddings</div>
+                <div class="ds-dst-s" id="info-model">paraphrase-multilingual-MiniLM-L12-v2</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- COMO FUNCIONA -->
+      <div class="ds-cd hidden lg:flex" id="how-it-works-card">
+        <div class="ds-cd-bd ds-ht">
+          <h3 class="ds-ht-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+            </svg>Como funciona?</h3>
+          <div class="ds-ht-s"><span class="ds-ht-n">1</span><span>Configure sua chave de API e escolha o modelo
+              desejado.</span></div>
+          <div class="ds-ht-s"><span class="ds-ht-n">2</span><span>Faça upload do documento PDF ou TXT.</span></div>
+          <div class="ds-ht-s"><span class="ds-ht-n">3</span><span>O agente recupera trechos relevantes do FAISS e a LLM
+              formula respostas precisas.</span></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CHAT -->
+    <section class="ds-mn">
+      <div class="ds-cht-h">
+        <div class="ds-cht-hl"><span class="ds-cht-hd" id="chat-agent-indicator"
+            style="background:var(--surface-3)"></span><span class="ds-cht-ht" id="chat-title-text">Aguardando documento
+            ser carregado</span></div>
+        <div class="ds-cht-hi"><span id="chat-history-count">0 de 10 mensagens</span><span
+            style="color:var(--text-muted)">|</span><span id="chat-model-indicator"
+            style="color:var(--text-muted)">—</span></div>
+      </div>
+      <div id="container-chat" class="ds-cht-c">
+        <div class="ds-msg ds-msg-a" id="welcome-message">
+          <div class="ds-msg-av ds-msg-ava"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg></div>
+          <div class="ds-wc">
+            <p class="ds-wc-h">Olá! Sou o seu Assistente de Documentos.</p>
+            <p class="ds-wc-p">Carregue um arquivo PDF ou TXT no menu ao lado. Depois que o arquivo for indexado,
+              poderei responder perguntas com base no conteúdo dele.</p>
+            <div class="ds-wc-t"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path
+                    d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                </svg> Configure sua API no painel ao lado.</span><span><svg viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg> Embeddings processados localmente.</span></div>
+          </div>
+        </div>
+      </div>
+      <div id="suggestion-chips" class="ds-chips hidden">
+        <span class="ds-chips-l"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18l6-6-6-6" />
+          </svg>Sugestões:</span>
+        <button class="ds-chip suggestion-chip">Qual o resumo do documento?</button>
+        <button class="ds-chip suggestion-chip">Quais são as datas importantes?</button>
+        <button class="ds-chip suggestion-chip">Há obrigações financeiras descritas?</button>
+      </div>
+      <form id="form-chat" class="ds-ci-w">
+        <div class="ds-ci-r">
+          <input type="text" id="input-msg" placeholder="Faça o upload do documento primeiro..." disabled
+            autocomplete="off" class="ds-ci" />
+          <button type="submit" id="btn-send" disabled class="ds-cs ds-cs-i"><svg viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13" />
+              <polygon points="22 2 15 22 11 13 2 9 22 2" />
+            </svg></button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <footer class="ds-ft">
+    <p style="margin:0">Copyright &copy; 2026 — Assistente de Documentos RAG Inteligente.</p>
+  </footer>
+
+  <script>
+    const API_BASE_URL = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
+      ? `${window.location.origin}/api` : 'http://localhost:8000/api';
+
+    // DOM refs
+    const dropZone = document.getElementById('drop-zone');
+    const inputFile = document.getElementById('input-file');
+    const btnUpload = document.getElementById('btn-upload');
+    const btnReset = document.getElementById('btn-reset');
+    const activeDocCard = document.getElementById('active-document-card');
+    const docFilename = document.getElementById('doc-filename');
+    const docSize = document.getElementById('doc-size');
+    const infoChunks = document.getElementById('info-chunks');
+    const docTypeBadge = document.getElementById('doc-type-badge');
+    const dropzoneTitle = document.getElementById('dropzone-title');
+    const dropzoneHint = document.getElementById('dropzone-hint');
+    const uploadIconWrap = document.getElementById('upload-icon-wrap');
+    const uploadIcon = document.getElementById('upload-icon');
+    const howItWorksCard = document.getElementById('how-it-works-card');
+    const connectionStatus = document.getElementById('connection-status');
+    const statusDot = document.getElementById('status-dot');
+    const chatContainer = document.getElementById('container-chat');
+    const chatTitleText = document.getElementById('chat-title-text');
+    const chatAgentIndicator = document.getElementById('chat-agent-indicator');
+    const chatHistoryCount = document.getElementById('chat-history-count');
+    const chatModelIndicator = document.getElementById('chat-model-indicator');
+    const formChat = document.getElementById('form-chat');
+    const inputMsg = document.getElementById('input-msg');
+    const btnSend = document.getElementById('btn-send');
+    const suggestionChips = document.getElementById('suggestion-chips');
+    const welcomeMessage = document.getElementById('welcome-message');
+    const selectProvider = document.getElementById('select-provider');
+    const inputApiKey = document.getElementById('input-api-key');
+    const btnToggleKey = document.getElementById('btn-toggle-key-visibility');
+    const keyVisibilityIcon = document.getElementById('key-visibility-icon');
+    const selectModel = document.getElementById('select-model');
+    const btnConfigureApi = document.getElementById('btn-configure-api');
+    const currentApiConfig = document.getElementById('current-api-config');
+    const configProviderLabel = document.getElementById('config-provider-label');
+    const configModelLabel = document.getElementById('config-model-label');
+    const configKeyPreview = document.getElementById('config-key-preview');
+    const apiStatusBadge = document.getElementById('api-status-badge');
+    const apiStatusDot = document.getElementById('api-status-dot');
+    const apiStatusText = document.getElementById('api-status-text');
+    const apiConfigToggle = document.getElementById('api-config-toggle');
+    const apiConfigCard = document.getElementById('api-config-card');
+    const apiCollapseIcon = document.getElementById('api-collapse-icon');
+
+    let isDocumentLoaded = false;
+    let selectedFile = null;
+    let providersData = {};
+    let currentApiConfigData = null;
+
+    // Collapse toggle
+    apiConfigToggle.addEventListener('click', () => {
+      const isCollapsed = apiConfigCard.classList.toggle('cl');
+      apiCollapseIcon.classList.toggle('cl', isCollapsed);
+    });
+
+    // Key visibility toggle
+    let keyVisible = false;
+    btnToggleKey.addEventListener('click', () => {
+      keyVisible = !keyVisible;
+      inputApiKey.type = keyVisible ? 'text' : 'password';
+    });
+
+    // Providers
+    async function carregarProvedores() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/providers`);
+        if (response.ok) {
+          providersData = await response.json();
+          selectProvider.innerHTML = '<option value="">Selecione um provedor...</option>';
+          for (const [slug, info] of Object.entries(providersData)) {
+            const opt = document.createElement('option');
+            opt.value = slug; opt.textContent = `${info.label} (${info.models.length} modelos)`;
+            selectProvider.appendChild(opt);
+          }
+        }
+      } catch (e) { console.error('Erro ao carregar provedores:', e); }
+    }
+
+    selectProvider.addEventListener('change', () => {
+      const slug = selectProvider.value;
+      if (slug && providersData[slug]) {
+        inputApiKey.disabled = false;
+        inputApiKey.placeholder = `Insira sua chave da API ${providersData[slug].label}...`;
+        selectModel.disabled = false;
+        const models = providersData[slug].models || [];
+        selectModel.innerHTML = '';
+        models.forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = m; selectModel.appendChild(o); });
+        if (currentApiConfigData && currentApiConfigData.provider === slug && currentApiConfigData.model) selectModel.value = currentApiConfigData.model;
+        btnConfigureApi.disabled = false;
+      } else {
+        inputApiKey.disabled = true; inputApiKey.placeholder = 'Selecione um provedor primeiro...';
+        selectModel.disabled = true; selectModel.innerHTML = '<option value="">Selecione um provedor primeiro...</option>';
+        btnConfigureApi.disabled = true;
+      }
+    });
+
+    btnConfigureApi.addEventListener('click', async () => {
+      const provider = selectProvider.value;
+      const apiKey = inputApiKey.value.trim();
+      const model = selectModel.value;
+      if (!provider) { adicionarLogMensagemSystem('error', 'Selecione um provedor.'); return; }
+      if (!apiKey || apiKey.length < 8) { adicionarLogMensagemSystem('error', 'Insira uma chave de API válida (mínimo 8 caracteres).'); return; }
+      if (!model) { adicionarLogMensagemSystem('error', 'Selecione um modelo.'); return; }
+      btnConfigureApi.disabled = true;
+      btnConfigureApi.innerHTML = '<svg class="animate-spin" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-dasharray="32" opacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" opacity=".75"/></svg> Salvando...';
+      try {
+        const response = await fetch(`${API_BASE_URL}/configure`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider, api_key: apiKey, model })
+        });
+        if (!response.ok) { const err = await response.json(); throw new Error(err.detail || JSON.stringify(err)); }
+        const data = await response.json();
+        currentApiConfigData = { provider, model, api_key: apiKey };
+        const label = providersData[provider]?.label || provider;
+        configProviderLabel.textContent = label;
+        configModelLabel.textContent = model;
+        configKeyPreview.textContent = apiKey.substring(0, 8) + '••••' + apiKey.substring(apiKey.length - 4);
+        currentApiConfig.classList.remove('hidden');
+        apiStatusBadge.classList.remove('hidden');
+        apiStatusBadge.className = 'ds-cbg slide-down';
+        apiStatusDot.style.background = 'var(--success)';
+        apiStatusText.textContent = label;
+        chatModelIndicator.textContent = `${label}: ${model}`;
+        adicionarLogMensagemSystem('success', `API configurada: ${label} / ${model}`);
+      } catch (error) {
+        adicionarLogMensagemSystem('error', `Falha ao configurar API: ${error.message}`);
+      } finally {
+        btnConfigureApi.disabled = false;
+        btnConfigureApi.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15v5M9 3l3-3 3 3"/><path d="M5 21h14"/></svg> Salvar Configuração';
+      }
+    });
+
+    async function carregarConfiguracaoAtual() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/configure`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.configured) {
+            currentApiConfigData = { provider: data.provider, model: data.model };
+            const label = providersData[data.provider]?.label || data.provider;
+            configProviderLabel.textContent = label;
+            configModelLabel.textContent = data.model;
+            configKeyPreview.textContent = '(recarregue a chave)';
+            currentApiConfig.classList.remove('hidden');
+            apiStatusBadge.classList.remove('hidden');
+            apiStatusBadge.className = 'ds-cbg slide-down';
+            apiStatusDot.style.background = 'var(--success)';
+            apiStatusText.textContent = label;
+            chatModelIndicator.textContent = `${label}: ${data.model}`;
+            if (providersData[data.provider]) {
+              selectProvider.value = data.provider;
+              inputApiKey.disabled = false; selectModel.disabled = false;
+              const models = providersData[data.provider].models || [];
+              selectModel.innerHTML = '';
+              models.forEach(m => { const o = document.createElement('option'); o.value = m; o.textContent = m; selectModel.appendChild(o); });
+              selectModel.value = data.model;
+              btnConfigureApi.disabled = false;
+            }
+          } else if (data.fallback_to_env) { chatModelIndicator.textContent = 'Usando .env (Groq)'; }
+        }
+      } catch (e) { console.error('Erro ao carregar configuração:', e); }
+    }
+
+    async function verificarStatusServidor() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/health`);
+        if (response.ok) {
+          const data = await response.json();
+          statusDot.style.background = '';
+          connectionStatus.className = 'ds-st ds-st-on';
+          if (data.agente_configurado) atualizarInterfaceDocumentoCarregado(true, data.nome_documento, data.mensagens_no_historico, data.chunks_count);
+          else atualizarInterfaceDocumentoCarregado(false);
+          if (data.api_configured && !currentApiConfigData) {
+            currentApiConfigData = { provider: data.api_provider, model: data.api_model };
+            const label = providersData[data.api_provider]?.label || data.api_provider;
+            configProviderLabel.textContent = label;
+            configModelLabel.textContent = data.api_model;
+            configKeyPreview.textContent = '(da sessão)';
+            currentApiConfig.classList.remove('hidden');
+            apiStatusBadge.classList.remove('hidden');
+            apiStatusBadge.className = 'ds-cbg slide-down';
+            apiStatusDot.style.background = 'var(--success)';
+            apiStatusText.textContent = label;
+            chatModelIndicator.textContent = `${label}: ${data.api_model}`;
+          }
+        } else { marcarServidorComoOffline(); }
+      } catch (error) { marcarServidorComoOffline(); }
+    }
+
+    function marcarServidorComoOffline() {
+      statusDot.style.background = '';
+      statusDot.classList.add('pulse-soft');
+      connectionStatus.className = 'ds-st ds-st-off';
+      desabilitarInputChat(true, 'Servidor offline...');
+      btnUpload.disabled = true;
+      btnUpload.className = 'ds-btn ds-btn-s ds-btn-full ds-btn-disabled';
+    }
+
+    // File upload
+    dropZone.addEventListener('click', () => inputFile.click());
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('ac'); });
+    ['dragleave', 'drop'].forEach(ev => dropZone.addEventListener(ev, () => dropZone.classList.remove('ac')));
+    dropZone.addEventListener('drop', (e) => { e.preventDefault(); if (e.dataTransfer.files.length > 0) lidarComSelecaoDeArquivo(e.dataTransfer.files[0]); });
+    inputFile.addEventListener('change', () => { if (inputFile.files.length > 0) lidarComSelecaoDeArquivo(inputFile.files[0]); });
+
+    function lidarComSelecaoDeArquivo(file) {
+      const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+      if (ext !== '.pdf' && ext !== '.txt') { adicionarLogMensagemSystem('error', 'Erro: Apenas arquivos PDF ou TXT são suportados.'); return; }
+      if (file.size > 10 * 1024 * 1024) { adicionarLogMensagemSystem('error', 'Erro: O arquivo excede o limite de 10MB.'); return; }
+      selectedFile = file;
+      dropZone.classList.remove('ac'); dropZone.classList.add('hf');
+      uploadIconWrap.style.color = 'var(--success)';
+      dropzoneTitle.textContent = file.name;
+      dropzoneHint.textContent = formatarBytes(file.size);
+    }
+
+    function formatarBytes(bytes) { if (bytes === 0) return '0 Bytes'; const k = 1024; const sizes = ['Bytes', 'KB', 'MB']; const i = Math.floor(Math.log(bytes) / Math.log(k)); return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]; }
+
+    btnUpload.addEventListener('click', async () => {
+      if (!selectedFile) { adicionarLogMensagemSystem('error', 'Selecione um arquivo PDF ou TXT primeiro!'); return; }
+      btnUpload.disabled = true;
+      btnUpload.classList.add('ds-btn-load');
+      btnUpload.innerHTML = '<svg class="animate-spin" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-dasharray="32" opacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" opacity=".75"/></svg> Processando... (~1 min na 1ª vez)';
+      adicionarLogMensagemSystem('info', `Indexando "${selectedFile.name}"... O modelo de embeddings local está sendo ativado.`);
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      try {
+        const response = await fetch(`${API_BASE_URL}/upload`, { method: 'POST', body: formData });
+        if (!response.ok) { const err = await response.json(); throw new Error(err.detail || 'Erro desconhecido no upload.'); }
+        const data = await response.json();
+        atualizarInterfaceDocumentoCarregado(true, selectedFile.name, 0, data.chunks_gerados);
+        adicionarMensagemChat('assistant', `Documento **"${selectedFile.name}"** carregado e indexado com sucesso! Dividido em **${data.chunks_gerados} chunks**.\\n\\nO agente RAG está pronto. Pergunte qualquer detalhe sobre o arquivo!`);
+        selectedFile = null;
+        dropZone.classList.remove('hf');
+        uploadIconWrap.style.color = '';
+        dropzoneTitle.textContent = 'Clique para selecionar';
+        dropzoneHint.textContent = 'PDF ou TXT (máx. 10MB)';
+        btnUpload.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Processar Documento';
+      } catch (error) {
+        adicionarLogMensagemSystem('error', `Falha ao processar o arquivo: ${error.message}`);
+        btnUpload.disabled = false;
+        btnUpload.classList.remove('ds-btn-load');
+        btnUpload.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Processar Documento';
+      }
+    });
+
+    function atualizarInterfaceDocumentoCarregado(loaded, filename = '', msgCount = 0, chunks = null) {
+      isDocumentLoaded = loaded;
+      if (loaded) {
+        activeDocCard.classList.remove('hidden');
+        if (filename) docFilename.textContent = filename;
+        docSize.textContent = 'Indexado no FAISS local';
+        infoChunks.textContent = chunks || 'Disponível';
+        const ext = filename.substring(filename.lastIndexOf('.')).toLowerCase();
+        if (ext === '.pdf') { docTypeBadge.style.background = 'rgba(233,80,77,.12)'; docTypeBadge.style.color = 'var(--danger)'; }
+        else { docTypeBadge.style.background = 'rgba(93,142,255,.12)'; docTypeBadge.style.color = 'var(--info)'; }
+        desabilitarInputChat(false);
+        chatTitleText.textContent = 'Conectado ao documento';
+        chatAgentIndicator.style.background = 'var(--success)';
+        chatHistoryCount.textContent = `${msgCount} de 10 mensagens`;
+        suggestionChips.classList.remove('hidden');
+        btnReset.classList.remove('hidden');
+        if (chatContainer.children.length > 2) welcomeMessage.classList.add('hidden');
+        btnUpload.disabled = false;
+        btnUpload.className = 'ds-btn ds-btn-p ds-btn-full';
+        btnUpload.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Processar Documento';
+      } else {
+        activeDocCard.classList.add('hidden');
+        desabilitarInputChat(true, 'Faça o upload do documento primeiro...');
+        chatTitleText.textContent = 'Aguardando documento ser carregado';
+        chatAgentIndicator.style.background = 'var(--surface-3)';
+        chatHistoryCount.textContent = '0 de 10 mensagens';
+        suggestionChips.classList.add('hidden');
+        btnReset.classList.add('hidden');
+        welcomeMessage.classList.remove('hidden');
+      }
+    }
+
+    function desabilitarInputChat(disabled, placeholder = 'Pergunte algo sobre o documento...') {
+      inputMsg.disabled = disabled; inputMsg.placeholder = placeholder; btnSend.disabled = disabled;
+      btnSend.className = disabled ? 'ds-cs ds-cs-i' : 'ds-cs ds-cs-a';
+      if (disabled) inputMsg.style.opacity = '.4';
+      else inputMsg.style.opacity = '1';
+    }
+
+    btnReset.addEventListener('click', async () => {
+      if (!confirm('Tem certeza que deseja resetar a sessão?')) return;
+      try {
+        const response = await fetch(`${API_BASE_URL}/reset`, { method: 'DELETE' });
+        if (response.ok) {
+          chatContainer.innerHTML = ''; chatContainer.appendChild(welcomeMessage); welcomeMessage.classList.remove('hidden');
+          atualizarInterfaceDocumentoCarregado(false);
+          adicionarLogMensagemSystem('info', 'Sessão resetada com sucesso.');
+        } else { adicionarLogMensagemSystem('error', 'Falha ao resetar o servidor.'); }
+      } catch (error) { adicionarLogMensagemSystem('error', 'Erro ao conectar no servidor para resetar.'); }
+    });
+
+    formChat.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const question = inputMsg.value.trim();
+      if (!question || !isDocumentLoaded) return;
+      inputMsg.value = '';
+      welcomeMessage.classList.add('hidden');
+      adicionarMensagemChat('user', question);
+      const loadingId = 'loading-' + Date.now();
+      adicionarLoaderRaciocinio(loadingId);
+      try {
+        const response = await fetch(`${API_BASE_URL}/chat`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question })
+        });
+        const loadingElement = document.getElementById(loadingId);
+        if (loadingElement) loadingElement.remove();
+        if (!response.ok) { const err = await response.json(); throw new Error(err.detail || 'Erro ao processar sua pergunta.'); }
+        const data = await response.json();
+        adicionarMensagemChat('assistant', data.answer);
+        try {
+          const hr = await fetch(`${API_BASE_URL}/health`);
+          if (hr.ok) { const hd = await hr.json(); chatHistoryCount.textContent = `${hd.mensagens_no_historico} de 10 mensagens`; }
+        } catch (e) { }
+      } catch (error) {
+        const loadingElement = document.getElementById(loadingId);
+        if (loadingElement) loadingElement.remove();
+        adicionarMensagemChat('assistant', `Erro ao obter resposta: ${error.message}. Verifique o console para detalhes.`);
+      }
+    });
+
+    document.querySelectorAll('.suggestion-chip').forEach(chip => {
+      chip.addEventListener('click', () => { if (isDocumentLoaded) { inputMsg.value = chip.textContent.trim(); inputMsg.focus(); } });
+    });
+
+    function adicionarMensagemChat(sender, text) {
+      const wrapper = document.createElement('div');
+      wrapper.className = `ds-msg ${sender === 'user' ? 'ds-msg-u' : 'ds-msg-a'} slide-up`;
+      const userIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="12" r="4"/></svg>';
+      const botIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+      const av = sender === 'user' ? 'ds-msg-avu' : 'ds-msg-ava';
+      const bub = sender === 'user' ? 'ds-msg-bu' : 'ds-msg-ba';
+      const icon = sender === 'user' ? userIcon : botIcon;
+      let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>');
+      html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>').replace(/`(.*?)`/g, '<code>$1</code>');
+      html = html.replace(/^> (.*)$/gim, '<blockquote>$1</blockquote>').replace(/\n/g, '<br>');
+      wrapper.innerHTML = `<div class="ds-msg-av ${av}">${icon}</div><div class="ds-msg-b ${bub}">${html}</div>`;
+      chatContainer.appendChild(wrapper);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function adicionarLoaderRaciocinio(id) {
+      const wrapper = document.createElement('div');
+      wrapper.id = id; wrapper.className = 'ds-msg ds-msg-a slide-up';
+      wrapper.innerHTML = '<div class="ds-msg-av ds-msg-ava"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div><div class="ds-msg-b ds-msg-ba ds-msg-ld"><div class="ds-msg-ldd"><div></div><div></div><div></div></div><span class="ds-msg-ldt">Buscando trechos relevantes...</span></div>';
+      chatContainer.appendChild(wrapper);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function adicionarLogMensagemSystem(type, text) {
+      const log = document.createElement('div');
+      const icons = { error: '<path d="M12 9v4M12 17v0"/><circle cx="12" cy="12" r="10"/>', info: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="8"/>', success: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>' };
+      log.className = `ds-log ds-log-${type} slide-down`;
+      log.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icons[type] || icons.info}</svg> ${text}`;
+      chatContainer.appendChild(log);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    // Init
+    window.addEventListener('DOMContentLoaded', async () => {
+      await carregarProvedores();
+      await carregarConfiguracaoAtual();
+      await verificarStatusServidor();
+      setInterval(verificarStatusServidor, 10000);
+    });
+  </script>
+</body>
+
+</html>

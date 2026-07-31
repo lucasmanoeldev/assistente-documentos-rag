@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+*.egg
+
+# Virtual environments
+.venv
+venv/
+
+# Environment
+.env
+
+# Uploads
+temp_uploads/
+
+# Database
+db.sqlite3
+
+# FAISS indexes
+faiss_indexes/
+
+# Logs
+*.log
+
+# Misc
+nul
+*.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
