@@ -1,5 +1,7 @@
 # Assistente de Documentos com RAG
 
+[![GitHub](https://img.shields.io/badge/GitHub-lucasmanoeldev%2Fassistente--documentos--rag-181717?logo=github)](https://github.com/lucasmanoeldev/assistente-documentos-rag)
+
 Assistente conversacional inteligente que utiliza **RAG (Retrieval-Augmented Generation)** para responder perguntas com base no conteúdo de documentos PDF e TXT.
 
 ## Funcionalidades
