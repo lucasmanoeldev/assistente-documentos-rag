@@ -110,6 +110,9 @@ Acesse a interface web em [http://localhost:8000](http://localhost:8000).
     ├── settings.py
     └── urls.py
 ```
+## Imagem
+
+<img width="1905" height="948" alt="image" src="https://github.com/user-attachments/assets/9f337923-c899-4c29-83e0-4f39f822bc32" />
 
 ## Licença
 
