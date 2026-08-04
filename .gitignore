@@ -29,6 +29,7 @@ faiss_indexes/
 # Misc
 nul
 *.txt
+!requirements.txt
 
 # IDE
 .vscode/
