@@ -1,3 +1,4 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
 python-dotenv>=1.0.0
 django>=5.0
 djangorestframework>=3.15
