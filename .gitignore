@@ -28,8 +28,6 @@ faiss_indexes/
 
 # Misc
 nul
-*.txt
-!requirements.txt
 
 # IDE
 .vscode/
@@ -40,3 +38,10 @@ nul
 # OS
 .DS_Store
 Thumbs.db
+ 
+# Local configuration and generated assets
+.env.*
+!.env.example
+staticfiles/
+.pytest_cache/
+.ruff_cache/

@@ -3,7 +3,7 @@ services:
     name: assistente-documentos-rag
     runtime: python
     buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate"
-    startCommand: "gunicorn rag_project.wsgi:application --timeout 120 --workers 2"
+    startCommand: "gunicorn --chdir backend rag_project.wsgi:application --timeout 120 --workers 2"
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9

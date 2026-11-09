@@ -1,119 +1,121 @@
 # Assistente de Documentos com RAG
 
-[![GitHub](https://img.shields.io/badge/GitHub-lucasmanoeldev%2Fassistente--documentos--rag-181717?logo=github)](https://github.com/lucasmanoeldev/assistente-documentos-rag)
-
-Assistente conversacional inteligente que utiliza **RAG (Retrieval-Augmented Generation)** para responder perguntas com base no conteúdo de documentos PDF e TXT.
+Assistente conversacional para consultar documentos PDF e TXT com Django, LangChain, LangGraph, FAISS e Groq.
 
 ## Funcionalidades
 
-- Upload de documentos PDF e TXT (até 10 MB)
-- Indexação local com **ChromaDB** e embeddings `paraphrase-multilingual-MiniLM-L12-v2`
-- Chat interativo com histórico de conversa persistente por sessão
-- Recuperação semântica de trechos relevantes via FAISS
-- Respostas geradas por LLMs da **Groq** ou **OpenRouter**
-- Interface web responsiva construída com **Tailwind CSS**
+- Upload de PDF e TXT de até 10 MB.
+- Busca semântica com embeddings multilíngues e FAISS.
+- Respostas com contexto recuperado dos documentos.
+- Histórico por sessão e opção de reiniciar a conversa.
+- Interface HTML com Tailwind CSS, servida pelo próprio Django.
 
-## Stack
+## Organização
 
-| Camada | Tecnologias |
-|--------|-------------|
-| **Backend** | Django 5.0 + Django REST Framework |
-| **LLM / Agentes** | LangChain, LangGraph, Groq API / OpenRouter |
-| **Embeddings** | HuggingFace (`paraphrase-multilingual-MiniLM-L12-v2`) |
-| **Vector Store** | FAISS |
+```text
+assistente-documentos-rag/
+├── backend/
+│   ├── rag_api/              # API, modelos, migrações e motor RAG
+│   └── rag_project/          # Settings, URLs, WSGI e ASGI
+├── frontend/
+│   └── templates/
+│       └── index.html        # Interface web
+├── manage.py                 # Entrada dos comandos Django
+├── .env.example              # Exemplo de configuração
+├── pyproject.toml            # Metadados e dependências
+├── requirements.txt          # Instalação com pip e Render
+├── uv.lock                   # Dependências resolvidas pelo uv
+└── render.yaml               # Configuração de deploy
+```
 
-## Endpoints da API
+Frontend e backend usam o mesmo servidor. Não é necessário iniciar um processo separado para a interface.
+
+## Instalação
+
+Requer Python 3.10+ e uma chave da Groq.
+
+```bash
+git clone https://github.com/lucasmanoeldev/assistente-documentos-rag.git
+cd assistente-documentos-rag
+uv sync
+```
+
+Copie `.env.example` para `.env` na raiz e preencha:
+
+```env
+GROQ_API_KEY=sua_chave_aqui
+GROQ_MODEL=llama-3.3-70b-versatile
+```
+
+Execute os comandos a partir da raiz:
+
+```bash
+uv run python manage.py migrate
+uv run python manage.py runserver
+```
+
+Acesse [http://localhost:8000](http://localhost:8000).
+
+Alternativa com pip:
+
+```bash
+python -m venv .venv
+# Windows:
+.venv\Scripts\activate
+# Linux/macOS:
+source .venv/bin/activate
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py runserver
+```
+
+No primeiro processamento, o modelo de embeddings `paraphrase-multilingual-MiniLM-L12-v2` será baixado; é necessário acesso à internet.
+
+## Fluxo RAG
+
+1. O documento é carregado e dividido em trechos de 1500 caracteres, com sobreposição de 300.
+2. Os embeddings são indexados no FAISS.
+3. O agente busca trechos relevantes e usa a Groq para gerar a resposta.
+4. O histórico e os índices são persistidos localmente por sessão.
+
+O motor atual usa `GROQ_API_KEY` e `GROQ_MODEL` do ambiente. A interface ainda contém opções de outros provedores, mas elas não estão implementadas no motor.
+
+## API
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| `GET` | `/api/health` | Status da sessão e documentos |
-| `POST` | `/api/upload` | Upload de PDF ou TXT |
-| `POST` | `/api/chat` | Envia pergunta e recebe resposta |
-| `DELETE` | `/api/reset` | Reseta agente e histórico |
+| GET | `/api/health` | Estado da sessão |
+| POST | `/api/upload` | Upload de documento |
+| POST | `/api/chat` | Pergunta sobre o documento |
+| DELETE | `/api/reset` | Reinicia a sessão |
 
-## Pré-requisitos
+Consulte `backend/rag_api/urls.py` para as rotas auxiliares de configuração.
 
-- Python **3.10+**
-- [uv](https://github.com/astral-sh/uv) (gerenciador de pacotes)
+## Dados locais
 
-## Configuração
+O banco `db.sqlite3`, os índices em `faiss_indexes/` e os arquivos temporários em `temp_uploads/` continuam na raiz e são ignorados pelo Git. A reorganização preserva os caminhos dos dados existentes.
 
-1. Clone o repositório:
+## Deploy no Render
 
-   ```bash
-   git clone https://github.com/lucasmanoeldev/assistente-documentos-rag.git
-   cd assistente-documentos-rag
-   ```
-
-2. Crie o ambiente virtual e instale as dependências:
-
-   ```bash
-   uv sync
-   ```
-
-3. Configure as variáveis de ambiente no arquivo `.env`:
-
-   ```env
-   GROQ_API_KEY=sua_chave_aqui
-   GROQ_MODEL=llama-3.3-70b-versatile
-   ```
-
-4. Execute as migrações:
-
-   ```bash
-   uv run manage.py migrate
-   ```
-
-## Executando o projeto
+O `render.yaml` instala as dependências, coleta os arquivos estáticos, executa as migrações e inicia:
 
 ```bash
-uv run manage.py runserver
+gunicorn --chdir backend rag_project.wsgi:application --timeout 120 --workers 2
 ```
 
-Acesse a interface web em [http://localhost:8000](http://localhost:8000).
+Configure `GROQ_API_KEY` e, opcionalmente, `GROQ_MODEL` no ambiente do serviço. Para persistir índices e SQLite entre deploys, configure armazenamento persistente.
 
-## Como funciona
+## Verificação local
 
-1. O usuário faz upload de um arquivo PDF ou TXT
-2. O documento é dividido em chunks de 1500 caracteres com sobreposição de 300
-3. Os chunks são transformados em embeddings e armazenados no FAISS local
-4. Quando o usuário faz uma pergunta, o agente RAG usa LangGraph para buscar os trechos mais relevantes
-5. A LLM gera uma resposta baseada exclusivamente no conteúdo encontrado
-
-## Provedores suportados
-
-| Provedor | Modelos |
-|----------|---------|
-| **OpenAI** | gpt-4o, gpt-4o-mini, gpt-4-turbo, gpt-3.5-turbo |
-| **Google Gemini** | gemini-1.5-pro, gemini-1.5-flash, gemini-1.0-pro |
-| **Groq** | llama-3.3-70b-versatile, llama-3.1-8b-instant, mixtral-8x7b-32768 |
-| **OpenRouter** | openai/gpt-4o, anthropic/claude-3.5-sonnet, google/gemini-1.5-flash |
-| **NVIDIA** | mistralai/mistral-7b-instruct-v0.3, meta/llama-3.1-8b-instruct |
-
-## Estrutura do projeto
-
+```bash
+uv run python manage.py check
+uv run python manage.py test
 ```
-.
-├── app.py                      # Código legado (não utilizado na versão Django)
-├── faiss_indexes/              # Índices FAISS gerados por sessão
-├── manage.py                   # CLI do Django
-├── pyproject.toml              # Dependências e metadados
-├── rag_api/                    # Aplicação Django
-│   ├── models.py              # Modelos Document e ChatMessage
-│   ├── rag_engine.py          # Motor RAG (regras e interface de chat)
-│   ├── serializers.py         # Serializadores DRF
-│   ├── templates/
-│   │   └── index.html         # Interface web (Tailwind)
-│   ├── urls.py                 # Rotas da API
-│   └── views.py               # Views DRF
-└── rag_project/               # Configuração do projeto Django
-    ├── settings.py
-    └── urls.py
-```
+
 ## Imagem
 
 <img width="1905" height="948" alt="image" src="https://github.com/user-attachments/assets/9f337923-c899-4c29-83e0-4f39f822bc32" />
 
 ## Licença
 
-Este projeto é para fins educacionais. Sinta-se livre para usá-lo e adaptá-lo conforme necessário.
+Este projeto é para fins educacionais. O repositório ainda não contém uma licença formal.

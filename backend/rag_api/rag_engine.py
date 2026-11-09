@@ -104,7 +104,7 @@ class SessionState:
     def _rebuild_agent(self, force: bool = False):
         if not self.vector_store:
             return
-        load_dotenv(override=True)
+        load_dotenv(settings.BASE_DIR / ".env", override=True)
 
         groq_key = os.getenv("GROQ_API_KEY")
 
